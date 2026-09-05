@@ -56,10 +56,9 @@ button,input,textarea{font:inherit;color:inherit}
 .pref.photo:hover{opacity:.92}
 .outline{fill:none;stroke:var(--accent);stroke-width:1.4;stroke-linejoin:round;pointer-events:none}
 .inset{fill:none;stroke:var(--border);stroke-width:.6}
-#pins.off{display:none}
-.pin{cursor:pointer}
-.pin .body{transition:transform .15s;transform-box:fill-box;transform-origin:center}
-.pin:hover .body,.pin.sel .body{transform:scale(1.9)}
+.pin{pointer-events:none;opacity:0;transition:opacity .12s}
+.pin.show,.pin.sel{opacity:1}
+.pin .body{transform:scale(1.8);transform-box:fill-box;transform-origin:center}
 .pin .frame{fill:#fff;stroke:rgba(0,0,0,.22);stroke-width:.4}
 .pin.sel .frame{stroke:var(--accent);stroke-width:.9}
 .pin .lead{stroke:var(--muted);stroke-width:.45;fill:none}
@@ -147,7 +146,7 @@ button,input,textarea{font:inherit;color:inherit}
         <span><i style="background:var(--land)"></i>まだ</span>
         <span><i style="background:var(--accent)"></i>行った（写真なし）</span>
         <span><i style="background:linear-gradient(135deg,#7f9bb8,#c8a97e)"></i>写真あり</span>
-        <label><input type="checkbox" id="pinToggle" checked>写真をピンで大きく表示</label>
+        <span style="padding-left:6px;border-left:1px solid var(--border)">県に触れると写真が大きく出ます</span>
       </div>
     </section>
     <aside class="panel" id="panel"><div class="inner" id="panelInner"></div></aside>
@@ -258,29 +257,25 @@ PREFS.forEach(p=>{
 });
 
 const tip = $("tip");
-function hitId(e){ const t = e.target.closest(".pref, .pin"); return t ? t.dataset.id : null; }
+function hitId(e){ const t = e.target.closest(".pref"); return t ? t.dataset.id : null; }
 svg.addEventListener("mousemove", e=>{
   const id = hitId(e); if(!id){tip.classList.remove("on");return;}
   const p = BY_ID[id], v = visits[id];
   const label = v ? `${p.name}${v.date?"・"+fmtDate(v.date):""}` : p.name;
-  tip.innerHTML = (v && v.thumb ? `<img src="${v.thumb}" alt="">` : "") + esc(label);
+  tip.textContent = label;
+  showPin(id);
   const r = mapEl.getBoundingClientRect();
   tip.style.left = (e.clientX - r.left) + "px";
   tip.style.top = (e.clientY - r.top) + "px";
   tip.classList.add("on");
 });
-svg.addEventListener("mouseleave", ()=>tip.classList.remove("on"));
-svg.addEventListener("mouseover", e=>{ const g=e.target.closest(".pin"); if(g) g.parentNode.appendChild(g); });
+svg.addEventListener("mouseleave", ()=>{ tip.classList.remove("on"); showPin(null); });
+function showPin(id){
+  Object.entries(pinEls).forEach(([k,el])=>el.classList.toggle("show", k===id));
+  const el = pinEls[id]; if(el) el.parentNode.appendChild(el); // 最前面へ
+}
 svg.addEventListener("click", e=>{ const id=hitId(e); if(id) select(id); });
 svg.addEventListener("keydown", e=>{ const id=hitId(e); if(id && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); select(id);} });
-
-const pinToggle = $("pinToggle");
-try{ pinToggle.checked = localStorage.getItem("tabi-pins") !== "off"; }catch{}
-$("pins").classList.toggle("off", !pinToggle.checked);
-pinToggle.addEventListener("change", ()=>{
-  $("pins").classList.toggle("off", !pinToggle.checked);
-  try{ localStorage.setItem("tabi-pins", pinToggle.checked ? "on" : "off"); }catch{}
-});
 
 function select(id){
   selected = id;
@@ -326,7 +321,7 @@ function renderMap(){
   renderPins();
 }
 
-/* 写真ピン：本土の重心に写真の札を立てる。密集地は互いに押しのけて重なりを避ける */
+/* 写真ピン：県に触れたとき、本土の重心に写真の札を出す */
 const PIN = 30, PAD = 2;
 const pinEls = {};
 function renderPins(){
@@ -334,16 +329,9 @@ function renderPins(){
   const ids = PREFS.filter(p=>visits[p.id] && visits[p.id].thumb).map(p=>p.id);
   Object.keys(pinEls).forEach(id=>{ if(!ids.includes(id)){ pinEls[id].remove(); delete pinEls[id]; } });
   const pos = ids.map(id=>({id, x:anchor[id][0], y:anchor[id][1]}));
-  const MIN = PIN + 3;
-  for(let it=0; it<80; it++){
-    let moved=false;
-    for(let a=0;a<pos.length;a++) for(let b=a+1;b<pos.length;b++){
-      const A=pos[a], B=pos[b]; let dx=B.x-A.x, dy=B.y-A.y; let d=Math.hypot(dx,dy);
-      if(d<MIN){ if(d<0.01){ dx=1; dy=0; d=1; } const push=(MIN-d)/2; A.x-=dx/d*push; A.y-=dy/d*push; B.x+=dx/d*push; B.y+=dy/d*push; moved=true; }
-    }
-    pos.forEach(P=>{ P.x=Math.min(438-PIN/2, Math.max(PIN/2, P.x)); P.y=Math.min(516-PIN/2, Math.max(PIN/2, P.y)); });
-    if(!moved) break;
-  }
+  // 一度に出るピンは1つだけなので、県の本土の重心にそのまま置く（画面外にはみ出さない範囲で）
+  const H = PIN*1.8/2;
+  pos.forEach(P=>{ P.x=Math.min(438-H, Math.max(H, P.x)); P.y=Math.min(516-H, Math.max(H, P.y)); });
   pos.forEach(P=>{
     const [ax,ay] = anchor[P.id];
     let el = pinEls[P.id];
