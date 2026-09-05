@@ -34,6 +34,10 @@ button,input,textarea{font:inherit;color:inherit}
 .head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding-bottom:20px;border-bottom:1px solid var(--border);margin-bottom:24px}
 .head h1{font-family:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;font-weight:600;font-size:30px;letter-spacing:.06em;margin:0;line-height:1.2}
 .head .sub{margin:6px 0 0;color:var(--muted);font-size:13px}
+
+/* ヒーロー動画（Remotion製。ライト／ダークで差し替え） */
+.hero{margin:0 0 24px;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--border)}
+.hero video{display:block;width:100%;aspect-ratio:16/9;max-height:520px;object-fit:cover;background:var(--bg)}
 .count{text-align:right;font-variant-numeric:tabular-nums;line-height:1}
 .count .n{font-family:"Shippori Mincho",serif;font-size:40px;font-weight:500}
 .count .d{color:var(--muted);font-size:15px;margin-left:4px}
@@ -138,6 +142,26 @@ button,input,textarea{font:inherit;color:inherit}
     </div>
     <div class="count"><span class="n" id="cnt">0</span><span class="d">/ 47</span><span class="l">訪れた都道府県</span></div>
   </header>
+
+  <div class="hero" aria-hidden="true">
+    <video id="hero" muted loop playsinline autoplay preload="metadata" disablepictureinpicture></video>
+  </div>
+  <script>
+  /* ヒーロー動画：OSのテーマに合わせてライト／ダークを切り替える。動きを減らす設定なら再生しない */
+  (function(){
+    const v = document.getElementById("hero");
+    const dark = matchMedia("(prefers-color-scheme: dark)");
+    const still = matchMedia("(prefers-reduced-motion: reduce)");
+    const pick = () => {
+      const src = "media/hero-" + (dark.matches ? "dark" : "light") + ".mp4";
+      if(v.getAttribute("src") === src) return;
+      v.muted = true; v.setAttribute("src", src); v.load();
+      if(still.matches){ v.autoplay = false; v.loop = false; v.pause(); }
+      else v.play().catch(()=>{});
+    };
+    pick(); dark.addEventListener("change", pick);
+  })();
+  </script>
 
   <div class="main">
     <section class="map" id="map" aria-label="日本地図">
